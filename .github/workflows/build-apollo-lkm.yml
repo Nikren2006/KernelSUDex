@@ -53,6 +53,8 @@ jobs:
           LLVM: ""
           CROSS_COMPILE: aarch64-linux-gnu-
           CROSS_COMPILE_ARM32: arm-linux-gnueabi-
+          KERNEL_REPO: https://github.com/MiCode/Xiaomi_Kernel_OpenSource
+          KERNEL_BRANCH: apollo-q-oss
           JOBS: "4"
         run: ./build_apollo_lkm.sh
 

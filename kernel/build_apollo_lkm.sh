@@ -32,6 +32,8 @@ OUT_DIR="${OUT_DIR:-$KSU_DIR/out_apollo}"
 KERNEL_SRC="${KERNEL_SRC:-$OUT_DIR/src}"
 DEFCONFIG="${DEFCONFIG:-vendor/apollo_user_defconfig}"
 BUILD_KERNEL="${BUILD_KERNEL:-1}"
+KERNEL_REPO="${KERNEL_REPO:-https://github.com/MiCode/Xiaomi_Kernel_OpenSource}"
+KERNEL_BRANCH="${KERNEL_BRANCH:-apollo-q-oss}"
 ARCH=arm64
 JOBS="${JOBS:-$(nproc)}"
 
@@ -67,8 +69,10 @@ if [ ! -f "$APOLLO_ZIP" ]; then
   exit 1
 fi
 
-if [ ! -d "$KERNEL_SRC/arch" ]; then
-  echo "[+] Extracting apollo kernel source..."
+if [ -d "$KERNEL_SRC/arch" ]; then
+  echo "[*] Using existing kernel source at $KERNEL_SRC"
+elif [ -f "$APOLLO_ZIP" ] && head -c4 "$APOLLO_ZIP" | grep -q "PK"; then
+  echo "[+] Extracting apollo kernel source from $APOLLO_ZIP..."
   mkdir -p "$OUT_DIR"
   TMP="$OUT_DIR/_extract"
   rm -rf "$TMP"
@@ -82,6 +86,10 @@ if [ ! -d "$KERNEL_SRC/arch" ]; then
   mv "$SRC_ROOT"/* "$KERNEL_SRC"/
   rmdir "$SRC_ROOT" 2>/dev/null || true
   rm -rf "$TMP"
+else
+  echo "[+] Cloning apollo kernel source from $KERNEL_REPO ($KERNEL_BRANCH)..."
+  mkdir -p "$OUT_DIR"
+  git clone --depth 1 -b "$KERNEL_BRANCH" "$KERNEL_REPO" "$KERNEL_SRC"
 fi
 
 cd "$KERNEL_SRC"
