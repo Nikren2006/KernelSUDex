@@ -49,7 +49,6 @@ jobs:
       - name: Build kernelsu.ko for Apollo (4.19)
         working-directory: kernel
         env:
-          BUILD_KERNEL: "1"
           CC: aarch64-linux-gnu-gcc-9
           HOSTCC: gcc-9
           LLVM: ""
@@ -60,11 +59,9 @@ jobs:
           JOBS: "4"
         run: ./build_apollo_lkm.sh
 
-      - name: Upload LKM and kernel image
+      - name: Upload LKM artifact
         uses: actions/upload-artifact@v7
         with:
           name: apollo-lkm
-          path: |
-            kernel/kernelsu-apollo.ko
-            kernel/out_apollo/src/arch/arm64/boot/Image.gz-dtb
+          path: kernel/kernelsu-apollo.ko
           if-no-files-found: warn

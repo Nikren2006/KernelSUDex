@@ -157,18 +157,18 @@ make "${MAKE_VARS[@]}" olddefconfig
 echo "[+] Configuration summary (KernelSU relevant):"
 grep -E "^(CONFIG_MODULES|CONFIG_MODULE_UNLOAD|CONFIG_MODVERSIONS|CONFIG_MODULE_SIG|CONFIG_KPROBES|CONFIG_EXT4_FS|CONFIG_SECURITY_SELINUX|CONFIG_KSU)=" .config || true
 
-if [ "$BUILD_KERNEL" = "1" ]; then
-  echo "[+] Building kernel image (enables KPROBES in vmlinux)..."
-  make "${MAKE_VARS[@]}" -j"$JOBS" Image.gz-dtb
-  echo "[+] Kernel image: $(ls -1 arch/arm64/boot/Image.gz-dtb 2>/dev/null || echo MISSING)"
-  echo "[+] NOTE: building vmlinux only (not all modules). The LKM loads via"
-  echo "[+] symbol name resolution, so Module.symvers CRCs are not required."
-else
-  echo "[+] Skipping full kernel build; running modules_prepare only."
-  echo "[!] Without a matching Module.symvers the .ko CRCs may not match the"
-  echo "[!] running kernel. Use BUILD_KERNEL=1 if loading into a rebuilt kernel."
-  make "${MAKE_VARS[@]}" modules_prepare
-fi
+# We only need the kernel tree *prepared* (scripts, include/generated,
+# host tools) to compile the external kernelsu.ko. Compiling the full
+# vendor kernel (Image.gz-dtb) pulls in camera/display/hid drivers whose
+# include paths rely on the vendor's full Android build and fail when built
+# standalone. The LKM resolves its symbols by name at insmod time against
+# the running kernel, so a full vmlinux is not required to build it.
+# NOTE: for the LKM to actually RUN, the device kernel must have
+# CONFIG_KPROBES (enabled above); if the stock kernel lacks it you must
+# rebuild the kernel image separately with KPROBES and flash it.
+echo "[+] Preparing kernel tree (modules_prepare) to build the LKM..."
+make "${MAKE_VARS[@]}" -j"$JOBS" modules_prepare
+echo "[+] Prepared tree; vmlinux not required to compile kernelsu.ko"
 
 echo "[+] Building kernelsu.ko (LKM) against $KERNEL_SRC"
 make -C "$KERNEL_SRC" "${MAKE_VARS[@]}" M="$KSU_DIR" src="$KSU_DIR" CONFIG_KSU=m modules -j"$JOBS"
