@@ -147,7 +147,11 @@ static int ksu_patch_text_nosync(void *dst, void *src, size_t len, int flags)
     void *map = set_fixmap_offset(FIX_TEXT_POKE0, phy);
     pr_debug("fixmap addr for patch 0x%lx: 0x%lx\n", p, (unsigned long)map);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
     ret = (int)copy_to_kernel_nofault(map, src, len);
+#else
+    ret = (int)probe_kernel_write(map, src, len);
+#endif
 
     clear_fixmap(FIX_TEXT_POKE0);
 

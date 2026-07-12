@@ -77,6 +77,35 @@ static void (*context_struct_compute_av_fn)(struct policydb *policydb, struct co
 static struct selinux_state fake_state;
 #endif
 
+// SELinux internal APIs (avc_has_perm, security_context_to_sid, ...) gained a
+// leading `struct selinux_state *` parameter in 5.7 and lost it again in 6.6,
+// so they are state-prefixed only on 5.7-6.5. 4.19 and >=6.6 use the
+// state-less form. The macros below are only expanded inside the < 6.6 code
+// path, so the >= 6.6 definitions (unused there) just mirror the 5.7 form.
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
+#define ksu_avc_has_perm(ssid, tsid, tclass, requested, avd)                                                \
+    avc_has_perm((ssid), (tsid), (tclass), (requested), (avd))
+#define ksu_security_context_to_sid(scontext, len, sid, gfp)                                                \
+    security_context_to_sid((scontext), (len), (sid), NULL, (gfp))
+#define ksu_security_sid_to_context(sid, scontext, len)                                                    \
+    security_sid_to_context((sid), (scontext), (len))
+#define ksu_security_context_str_to_sid(scontext, sid, gfp)                                                \
+    security_context_str_to_sid((scontext), (sid), NULL, (gfp))
+#define ksu_security_compute_av_user(ssid, tsid, tclass, avd)                                              \
+    security_compute_av_user((ssid), (tsid), (tclass), (avd))
+#else
+#define ksu_avc_has_perm(ssid, tsid, tclass, requested, avd)                                                \
+    ksu_avc_has_perm((ssid), (tsid), (tclass), (requested), (avd))
+#define ksu_security_context_to_sid(scontext, len, sid, gfp)                                                \
+    ksu_security_context_to_sid( (scontext), (len), (sid), (gfp))
+#define ksu_security_sid_to_context(sid, scontext, len)                                                    \
+    ksu_security_sid_to_context( (sid), (scontext), (len))
+#define ksu_security_context_str_to_sid(scontext, sid, gfp)                                                \
+    ksu_security_context_str_to_sid( (scontext), (sid), (gfp))
+#define ksu_security_compute_av_user(ssid, tsid, tclass, avd)                                              \
+    ksu_security_compute_av_user( (ssid), (tsid), (tclass), (avd))
+#endif
+
 static write_op_fn *context_write, *access_write;
 static write_op_fn orig_context_write, orig_access_write;
 
@@ -110,16 +139,15 @@ static ssize_t my_write_context(struct file *file, char *buf, size_t size)
         goto out;
     }
 #else
-    length = avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
-                          SECURITY__CHECK_CONTEXT, NULL);
+    length = ksu_avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY,
+                           SECURITY__CHECK_CONTEXT, NULL);
+    if (length)
+        goto out;
+    length = ksu_security_context_to_sid(buf, size, &sid, GFP_KERNEL);
     if (length)
         goto out;
 
-    length = security_context_to_sid(&fake_state, buf, size, &sid, GFP_KERNEL);
-    if (length)
-        goto out;
-
-    length = security_sid_to_context(&fake_state, sid, &canon, &len);
+    length = ksu_security_sid_to_context( sid, &canon, &len);
     if (length)
         goto out;
 #endif
@@ -147,7 +175,7 @@ static ssize_t my_write_access(struct file *file, char *buf, size_t size)
     length = avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
 #else
     length =
-        avc_has_perm(&selinux_state, current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
+        ksu_avc_has_perm(current_sid(), SECINITSID_SECURITY, SECCLASS_SECURITY, SECURITY__COMPUTE_AV, NULL);
 #endif
     if (length)
         goto out;
@@ -177,15 +205,15 @@ static ssize_t my_write_access(struct file *file, char *buf, size_t size)
 
     security_compute_av_user_with_policy(backup_sepolicy, ssid, tsid, tclass, &avd);
 #else
-    length = security_context_str_to_sid(&fake_state, scon, &ssid, GFP_KERNEL);
+    length = ksu_security_context_str_to_sid( scon, &ssid, GFP_KERNEL);
     if (length)
         goto out;
 
-    length = security_context_str_to_sid(&fake_state, tcon, &tsid, GFP_KERNEL);
+    length = ksu_security_context_str_to_sid( tcon, &tsid, GFP_KERNEL);
     if (length)
         goto out;
 
-    security_compute_av_user(&fake_state, ssid, tsid, tclass, &avd);
+    ksu_security_compute_av_user( ssid, tsid, tclass, &avd);
 #endif
 
     length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT, "%x %x %x %x %u %x", avd.allowed, 0xffffffff, avd.auditallow,
@@ -217,7 +245,7 @@ static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
     error = avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
 #else
-    error = avc_has_perm(&selinux_state, mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+    error = ksu_avc_has_perm(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
 #endif
     if (error) {
         return error;
@@ -231,7 +259,7 @@ static int __nocfi my_setprocattr(const char *name, void *value, size_t size)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
         error = security_context_to_sid_with_policy(backup_sepolicy, str, size, &sid, SECSID_NULL, GFP_KERNEL);
 #else
-        error = security_context_to_sid(&fake_state, str, size, &sid, GFP_KERNEL);
+        error = ksu_security_context_to_sid( str, size, &sid, GFP_KERNEL);
 #endif
         if (error) {
             return error;

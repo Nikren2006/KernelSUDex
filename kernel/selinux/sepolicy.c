@@ -591,7 +591,11 @@ static bool add_filename_trans(struct policydb *db, const char *s, const char *t
         new_key->name = kstrdup(key.name, GFP_KERNEL);
         trans->next = last;
         trans->otype = def->value;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
         hashtab_insert(&db->filename_trans, new_key, trans, filenametr_key_params);
+#else
+        hashtab_insert(&db->filename_trans, new_key, trans);
+#endif
     }
 
     db->compat_filename_trans_count++;
