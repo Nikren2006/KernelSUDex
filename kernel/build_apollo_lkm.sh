@@ -35,21 +35,26 @@ BUILD_KERNEL="${BUILD_KERNEL:-1}"
 ARCH=arm64
 JOBS="${JOBS:-$(nproc)}"
 
-CC="${CC:-clang}"
+CC="${CC:-}"
 LLVM="${LLVM:-}"
 CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
 CROSS_COMPILE_ARM32="${CROSS_COMPILE_ARM32:-arm-linux-gnueabi-}"
 LLVM_STRIP="${LLVM_STRIP:-llvm-strip}"
 STRIP="${STRIP:-aarch64-linux-gnu-strip}"
 
+# apollo 4.19 is a GCC-built vendor kernel; pass CC/LLVM only when set so
+# kbuild falls back to $(CROSS_COMPILE)gcc by default.
 MAKE_VARS=(
   ARCH="$ARCH"
-  CC="$CC"
-  LLVM="$LLVM"
-  CLANG_TRIPLE="${CLANG_TRIPLE:-aarch64-linux-gnu-}"
   CROSS_COMPILE="$CROSS_COMPILE"
   CROSS_COMPILE_ARM32="$CROSS_COMPILE_ARM32"
 )
+if [ -n "$CC" ]; then
+  MAKE_VARS+=( CC="$CC" )
+fi
+if [ -n "$LLVM" ]; then
+  MAKE_VARS+=( LLVM="$LLVM" CLANG_TRIPLE="${CLANG_TRIPLE:-aarch64-linux-gnu-}" )
+fi
 
 echo "[*] Script dir : $SCRIPT_DIR"
 echo "[*] Kernel src: $KERNEL_SRC"

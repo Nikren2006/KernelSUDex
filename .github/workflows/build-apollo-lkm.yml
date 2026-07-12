@@ -3,10 +3,10 @@ name: Build Apollo LKM (KernelSU)
 on:
   workflow_dispatch:
     inputs:
-      cc:
-        description: 'Clang compiler to use (must exist in apt)'
+      clang:
+        description: 'Set to a clang binary (e.g. clang-14) to build with LLVM instead of GCC'
         required: false
-        default: 'clang-14'
+        default: ''
         type: string
   push:
     paths:
@@ -36,17 +36,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            ${{ github.event.inputs.cc || 'clang-14' }} \
             gcc-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi \
             make bc bison flex libssl-dev libelf-dev zlib1g-dev \
             zip curl git python3 cpio
+          # Only needed when building with LLVM/clang
+          if [ -n "${{ github.event.inputs.clang }}" ]; then
+            sudo apt-get install -y --no-install-recommends ${{ github.event.inputs.clang }}
+          fi
 
       - name: Build kernelsu.ko for Apollo (4.19)
         working-directory: kernel
         env:
           BUILD_KERNEL: "1"
-          CC: ${{ github.event.inputs.cc || 'clang-14' }}
+          CC: ${{ github.event.inputs.clang }}
           LLVM: ""
           CROSS_COMPILE: aarch64-linux-gnu-
           CROSS_COMPILE_ARM32: arm-linux-gnueabi-
