@@ -1,0 +1,67 @@
+name: Build Apollo LKM (KernelSU)
+
+on:
+  workflow_dispatch:
+    inputs:
+      clang:
+        description: 'Set to a clang binary (e.g. clang-14) to build with LLVM instead of GCC'
+        required: false
+        default: ''
+        type: string
+  push:
+    paths:
+      - 'kernel/**'
+      - '.github/workflows/build-apollo-lkm.yml'
+  pull_request:
+    paths:
+      - 'kernel/**'
+      - '.github/workflows/build-apollo-lkm.yml'
+
+concurrency:
+  group: apollo-lkm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apollo-lkm:
+    name: Build kernelsu-apollo.ko (Android 12 / 4.19)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Install cross build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-9 \
+            gcc-9-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi \
+            make bc bison flex libssl-dev libelf-dev zlib1g-dev \
+            zip curl git python3 cpio
+          # Only needed when building with LLVM/clang
+          if [ -n "${{ github.event.inputs.clang }}" ]; then
+            sudo apt-get install -y --no-install-recommends ${{ github.event.inputs.clang }}
+          fi
+
+      - name: Build kernelsu.ko for Apollo (4.19)
+        working-directory: kernel
+        env:
+          CC: aarch64-linux-gnu-gcc-9
+          HOSTCC: gcc-9
+          LLVM: ""
+          CROSS_COMPILE: aarch64-linux-gnu-
+          CROSS_COMPILE_ARM32: arm-linux-gnueabi-
+          KERNEL_REPO: https://github.com/MiCode/Xiaomi_Kernel_OpenSource
+          KERNEL_BRANCH: apollo-q-oss
+          JOBS: "4"
+        run: ./build_apollo_lkm.sh
+
+      - name: Upload LKM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: apollo-lkm
+          path: kernel/kernelsu-apollo.ko
+          if-no-files-found: warn
