@@ -126,6 +126,21 @@ sed -i \
   -e 's/-Werror-implicit-function-declaration//g' \
   Makefile
 
+# Xiaomi/vendor 'extern inline' helpers (is_top_app, etc.) keep their body in
+# kernel/sched/core.c. Modern GCC force-inlines the call from another TU and
+# fails with "function body not available". Demote them to plain extern so
+# they are resolved out-of-line.
+if [ -f include/linux/sched.h ]; then
+  echo "[+] Demoting vendor extern-inline sched helpers to extern"
+  sed -i \
+    -e 's/^extern inline bool is_critical_task/extern bool is_critical_task/' \
+    -e 's/^extern inline bool is_top_app/extern bool is_top_app/' \
+    -e 's/^extern inline bool is_inherit_top_app/extern bool is_inherit_top_app/' \
+    -e 's/^extern inline void set_inherit_top_app/extern void set_inherit_top_app/' \
+    -e 's/^extern inline void restore_inherit_top_app/extern void restore_inherit_top_app/' \
+    include/linux/sched.h
+fi
+
 if [ ! -x "./scripts/kconfig/merge_config.sh" ]; then
   echo "[!] merge_config.sh missing; cannot apply LKM config fragment"
   exit 1
