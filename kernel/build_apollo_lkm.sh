@@ -36,7 +36,7 @@ ARCH=arm64
 JOBS="${JOBS:-$(nproc)}"
 
 CC="${CC:-clang}"
-LLVM="${LLVM:-1}"
+LLVM="${LLVM:-}"
 CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
 CROSS_COMPILE_ARM32="${CROSS_COMPILE_ARM32:-arm-linux-gnueabi-}"
 LLVM_STRIP="${LLVM_STRIP:-llvm-strip}"
@@ -98,10 +98,11 @@ echo "[+] Configuration summary (KernelSU relevant):"
 grep -E "^(CONFIG_MODULES|CONFIG_MODULE_UNLOAD|CONFIG_MODVERSIONS|CONFIG_MODULE_SIG|CONFIG_KPROBES|CONFIG_EXT4_FS|CONFIG_SECURITY_SELINUX|CONFIG_KSU)=" .config || true
 
 if [ "$BUILD_KERNEL" = "1" ]; then
-  echo "[+] Building kernel + modules (enables KPROBES, produces Module.symvers)..."
-  make "${MAKE_VARS[@]}" -j"$JOBS" Image.gz-dtb modules
+  echo "[+] Building kernel image (enables KPROBES in vmlinux)..."
+  make "${MAKE_VARS[@]}" -j"$JOBS" Image.gz-dtb
   echo "[+] Kernel image: $(ls -1 arch/arm64/boot/Image.gz-dtb 2>/dev/null || echo MISSING)"
-  echo "[+] Module.symvers: $(ls -1 Module.symvers 2>/dev/null || echo MISSING)"
+  echo "[+] NOTE: building vmlinux only (not all modules). The LKM loads via"
+  echo "[+] symbol name resolution, so Module.symvers CRCs are not required."
 else
   echo "[+] Skipping full kernel build; running modules_prepare only."
   echo "[!] Without a matching Module.symvers the .ko CRCs may not match the"
