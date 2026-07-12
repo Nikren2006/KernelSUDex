@@ -95,15 +95,15 @@ static struct selinux_state fake_state;
     security_compute_av_user((ssid), (tsid), (tclass), (avd))
 #else
 #define ksu_avc_has_perm(ssid, tsid, tclass, requested, avd)                                                \
-    ksu_avc_has_perm((ssid), (tsid), (tclass), (requested), (avd))
+    avc_has_perm(&selinux_state, (ssid), (tsid), (tclass), (requested), (avd))
 #define ksu_security_context_to_sid(scontext, len, sid, gfp)                                                \
-    ksu_security_context_to_sid( (scontext), (len), (sid), (gfp))
+    security_context_to_sid(&fake_state, (scontext), (len), (sid), (gfp))
 #define ksu_security_sid_to_context(sid, scontext, len)                                                    \
-    ksu_security_sid_to_context( (sid), (scontext), (len))
+    security_sid_to_context(&fake_state, (sid), (scontext), (len))
 #define ksu_security_context_str_to_sid(scontext, sid, gfp)                                                \
-    ksu_security_context_str_to_sid( (scontext), (sid), (gfp))
+    security_context_str_to_sid(&fake_state, (scontext), (sid), (gfp))
 #define ksu_security_compute_av_user(ssid, tsid, tclass, avd)                                              \
-    ksu_security_compute_av_user( (ssid), (tsid), (tclass), (avd))
+    security_compute_av_user(&fake_state, (ssid), (tsid), (tclass), (avd))
 #endif
 
 static write_op_fn *context_write, *access_write;
