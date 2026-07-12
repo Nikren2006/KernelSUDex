@@ -112,6 +112,20 @@ if grep -q "gcc-wrapper.py" Makefile; then
   sed -i 's|^CC[[:space:]]*=.*gcc-wrapper.py.*|CC = $(REAL_CC)|' Makefile
 fi
 
+# This CAF kernel enables several -Werror=* flags UNCONDITIONALLY (incl.
+# -Werror-implicit-function-declaration in the base KBUILD_CFLAGS). They
+# fail the build on vendor code when compiled with a modern(ish) GCC. Strip
+# them so the warnings no longer abort the build.
+echo "[+] Removing unconditional -Werror=* from Makefile"
+sed -i \
+  -e '/-Werror=implicit-int/d' \
+  -e '/-Werror=strict-prototypes/d' \
+  -e '/-Werror=date-time/d' \
+  -e '/-Werror=incompatible-pointer-types/d' \
+  -e '/-Werror=designated-init/d' \
+  -e 's/-Werror-implicit-function-declaration//g' \
+  Makefile
+
 if [ ! -x "./scripts/kconfig/merge_config.sh" ]; then
   echo "[!] merge_config.sh missing; cannot apply LKM config fragment"
   exit 1
