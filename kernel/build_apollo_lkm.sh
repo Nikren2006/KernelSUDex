@@ -94,6 +94,15 @@ fi
 
 cd "$KERNEL_SRC"
 
+# This CAF/Qualcomm kernel wraps CC with scripts/gcc-wrapper.py (Python 2),
+# which crashes under Python 3 and breaks the kconfig host tool and the build.
+# Drop the wrapper so the real cross gcc is used; HOSTCC (host gcc) is left
+# untouched, so host tools (conf, fixdep, modpost, ...) still build fine.
+if grep -q "gcc-wrapper.py" Makefile; then
+  echo "[+] Disabling Python 2 gcc-wrapper (using real cross compiler)"
+  sed -i 's|^CC[[:space:]]*=.*gcc-wrapper.py.*|CC = $(REAL_CC)|' Makefile
+fi
+
 if [ ! -x "./scripts/kconfig/merge_config.sh" ]; then
   echo "[!] merge_config.sh missing; cannot apply LKM config fragment"
   exit 1
