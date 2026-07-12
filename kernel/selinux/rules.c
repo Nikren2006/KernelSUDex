@@ -37,7 +37,11 @@ static void reset_avc_cache()
     struct selinux_avc *avc = selinux_state.avc;
     avc_ss_reset(avc, 0);
     selnl_notify_policyload(0);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
     selinux_status_update_policyload(&selinux_state, 0);
+#else
+    selinux_status_update_policyload(0);
+#endif
 #endif
     selinux_xfrm_notify_policyload();
 }

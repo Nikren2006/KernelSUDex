@@ -10,6 +10,7 @@
 #include "runtime/ksud.h"
 #include "manager/manager_observer.h"
 #include "manager/throne_tracker.h"
+#include "infra/symbol_resolver.h"
 
 bool ksu_module_mounted __read_mostly = false;
 bool ksu_boot_completed __read_mostly = false;
@@ -33,11 +34,16 @@ void on_post_fs_data(void)
     ksu_selinux_hide_handle_post_fs_data();
 }
 
-extern void ext4_unregister_sysfs(struct super_block *sb);
+// ext4_unregister_sysfs() is an ext4 internal helper that is not always
+// exported to modules (it is absent on some pre-5.x kernels, e.g. 4.19).
+// Resolve it at runtime via kallsyms so the module links regardless of whether
+// the symbol is exported, and simply skip the unregister when it is missing.
+typedef void (*ext4_unregister_sysfs_fn)(struct super_block *sb);
 
 int nuke_ext4_sysfs(const char *mnt)
 {
     struct path path;
+    ext4_unregister_sysfs_fn unregister_sysfs;
     int err = kern_path(mnt, 0, &path);
 
     if (err) {
@@ -51,7 +57,14 @@ int nuke_ext4_sysfs(const char *mnt)
         return -EINVAL;
     }
 
-    ext4_unregister_sysfs(path.dentry->d_inode->i_sb);
+    unregister_sysfs = (ext4_unregister_sysfs_fn)find_kernel_symbol_exact("ext4_unregister_sysfs");
+    if (!unregister_sysfs) {
+        pr_warn("nuke_ext4_sysfs: ext4_unregister_sysfs not found, skip\n");
+        path_put(&path);
+        return -ENOSYS;
+    }
+
+    unregister_sysfs(path.dentry->d_inode->i_sb);
     path_put(&path);
     return 0;
 }
